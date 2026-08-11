@@ -14,7 +14,7 @@ from email.message import EmailMessage
 
 st.set_page_config(
     page_title="Diler | Üretim Süresi Tahmin Sistemi",
-    page_icon="Diler_Logo_duzeltilmis.png",
+    page_icon="🔷",
     layout="wide"
 )
 
