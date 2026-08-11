@@ -137,6 +137,21 @@ st.divider()
 
 model = joblib.load("model.pkl")
 model_columns = joblib.load("model_columns.pkl")
+# ------------------------------------------------
+# EĞİTİM VERİSİNİ YÜKLE
+# ------------------------------------------------
+
+egitim_verisi = pd.read_excel(
+    "Diler Proje Verileri.xlsx"
+)
+
+gecerli_kombinasyonlar = set(
+    zip(
+        egitim_verisi["Y_CAP_FLM_MM"],
+        egitim_verisi["Y_KALITE_FLM"],
+        egitim_verisi["Y_KALITE_KTK"]
+    )
+)
 
 
 # ------------------------------------------------
@@ -304,57 +319,119 @@ if dosya is not None:
         )
 
 
-        # ------------------------------------------------
-        # 1 KÜTÜK İÇİN TAHMİN
-        # ------------------------------------------------
+    # ------------------------------------------------
+    # EĞİTİM VERİSİNDE BULUNAN KOMBİNASYONLARI KONTROL ET
+    # ------------------------------------------------
 
-        tahmin = model.predict(
-            model_data
+    gecerli_satirlar = []
+
+    for _, satir in yeni.iterrows():
+
+        kombinasyon = (
+            satir["Filmasin Cap mm -FILMASIN"],
+            satir["Mamul Kalitesi -FILMASIN"],
+            satir["Kutuk Kalitesi -KUTUK"]
         )
 
+        gecerli_satirlar.append(
+            kombinasyon in gecerli_kombinasyonlar
+        )
 
-        yeni[
+    yeni["TAHMIN_YAPILABILIR"] = gecerli_satirlar
+
+
+    # ------------------------------------------------
+    # TAHMİN SÜTUNLARINI OLUŞTUR
+    # ------------------------------------------------
+
+    yeni["TAHMINI_1_KUTUK_SURESI"] = "Tahmin yapılamadı"
+
+    yeni["TAHMINI_TOPLAM_SURE"] = 0.0
+
+
+    # ------------------------------------------------
+    # SADECE GEÇERLİ KOMBİNASYONLARI TAHMİN ET
+    # ------------------------------------------------
+
+    gecerli_index = yeni.index[
+        yeni["TAHMIN_YAPILABILIR"]
+    ]
+
+
+    if len(gecerli_index) > 0:
+
+        model_tahmin_data = model_data.loc[
+            gecerli_index
+        ]
+
+        tahmin = model.predict(
+            model_tahmin_data
+        )
+
+        yeni.loc[
+            gecerli_index,
             "TAHMINI_1_KUTUK_SURESI"
         ] = tahmin.round(2)
 
-
-        # ------------------------------------------------
-        # MİKTAR İLE ÇARP
-        # ------------------------------------------------
-
-        yeni[
+        yeni.loc[
+            gecerli_index,
             "TAHMINI_TOPLAM_SURE"
         ] = (
             tahmin
-            * yeni[
+            * yeni.loc[
+                gecerli_index,
                 "Uretilecek Paket Sayisi -FILMASIN"
             ]
         ).round(2)
 
 
-        # ------------------------------------------------
-        # TOPLAM SÜRE
-        # ------------------------------------------------
+    # ------------------------------------------------
+    # TOPLAM SÜRE
+    # ------------------------------------------------
 
-        toplam_sure = (
-            yeni[
-                "TAHMINI_TOPLAM_SURE"
-            ].sum()
+    toplam_sure = (
+        yeni[
+            "TAHMINI_TOPLAM_SURE"
+        ].sum()
+    )
+
+
+    saat = int(
+        toplam_sure // 3600
+    )
+
+    dakika = int(
+        (toplam_sure % 3600) // 60
+    )
+
+    saniye = int(
+        toplam_sure % 60
+    )
+
+
+    # ------------------------------------------------
+    # TAHMİN DURUMU
+    # ------------------------------------------------
+
+    tahmin_yapilamayan = (
+        (~yeni["TAHMIN_YAPILABILIR"]).sum()
+    )
+
+    tahmin_yapilabilen = (
+        yeni["TAHMIN_YAPILABILIR"].sum()
+    )
+
+
+    if tahmin_yapilamayan > 0:
+
+        st.warning(
+            f"⚠️ {tahmin_yapilamayan} ürün için tahmin "
+            f"oluşturulamadı. Bu ürünlerin çap / mamul kalitesi / "
+            f"kütük kalitesi kombinasyonları eğitim verilerinde "
+            f"bulunmamaktadır. Toplam süre yalnızca tahmin "
+            f"yapılabilen {tahmin_yapilabilen} ürün üzerinden "
+            f"hesaplanmıştır."
         )
-
-
-        saat = int(
-            toplam_sure // 3600
-        )
-
-        dakika = int(
-            (toplam_sure % 3600) // 60
-        )
-
-        saniye = int(
-            toplam_sure % 60
-        )
-
 
         # ------------------------------------------------
         # TOPLAM TAHMİNİ SÜRE KARTI
@@ -431,23 +508,12 @@ if dosya is not None:
         # TAHMİNİ BİTİŞ ZAMANI
         # ------------------------------------------------
 
-        st.markdown(
-            f"""
-            <div class="total-box">
+        st.subheader("Tahmini Üretim Bitiş Zamanı")
 
-                <div class="total-title">
-                    TAHMİNİ ÜRETİM BİTİŞ ZAMANI
-                </div>
-
-                <div class="total-value">
-                    {bitis_zamani.strftime("%d.%m.%Y %H:%M")}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
+        st.success(
+    f"🏭 Üretimin tahmini bitiş zamanı: "
+    f"{bitis_zamani.strftime('%d.%m.%Y %H:%M')}"
+)
 
         # ------------------------------------------------
         # TAHMİN SONUÇLARI
@@ -458,11 +524,15 @@ if dosya is not None:
         )
 
 
+        sonuc_gosterim = yeni.drop(
+    columns=["TAHMIN_YAPILABILIR"]
+)
+
         st.dataframe(
-            yeni,
-            use_container_width=True,
-            hide_index=True
-        )
+    sonuc_gosterim,
+    use_container_width=True,
+    hide_index=True
+)
 
 
         # ------------------------------------------------
