@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import smtplib
+import textwrap
 
 from io import BytesIO
 from pathlib import Path
@@ -667,64 +668,40 @@ if dosya is not None:
     col1, col2, col3 = st.columns(3)
 
 
-    with col1:
-
-        st.markdown(
-            f"""
-            <div class="card">
-
-                <div class="card-title">
-                    Toplam Ürün / Parti
-                </div>
-
-                <div class="card-value">
-                    {toplam_urun:,}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+with col1:
+    st.markdown(
+        textwrap.dedent(f"""
+        <div class="card">
+            <div class="card-title">Toplam Ürün / Parti</div>
+            <div class="card-value">{toplam_urun:,}</div>
+        </div>
+        """),
+        unsafe_allow_html=True
+    )
 
 
-    with col2:
-
-        st.markdown(
-            f"""
-            <div class="card">
-
-                <div class="card-title">
-                    Tahmin Yapılabilen
-                </div>
-
-                <div class="card-value">
-                    {tahmin_yapilan:,}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+with col2:
+    st.markdown(
+        textwrap.dedent(f"""
+        <div class="card">
+            <div class="card-title">Tahmin Yapılabilen</div>
+            <div class="card-value">{tahmin_yapilan:,}</div>
+        </div>
+        """),
+        unsafe_allow_html=True
+    )
 
 
-    with col3:
-
-        st.markdown(
-            f"""
-            <div class="card">
-
-                <div class="card-title">
-                    Tahmin Yapılamayan
-                </div>
-
-                <div class="card-value">
-                    {tahmin_yapilamayan:,}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+with col3:
+    st.markdown(
+        textwrap.dedent(f"""
+        <div class="card">
+            <div class="card-title">Tahmin Yapılamayan</div>
+            <div class="card-value">{tahmin_yapilamayan:,}</div>
+        </div>
+        """),
+        unsafe_allow_html=True
+    )
 
 
     # ========================================================
@@ -801,21 +778,18 @@ if dosya is not None:
     # ========================================================
 
     st.markdown(
-        f"""
-        <div class="total-box">
-
-            <div class="total-title">
-                TOPLAM TAHMİNİ ÜRETİM SÜRESİ
-            </div>
-
-            <div class="total-value">
-                {saat} saat {dakika} dakika {saniye} saniye
-            </div>
-
+    textwrap.dedent(f"""
+    <div class="total-box">
+        <div class="total-title">
+            TOPLAM TAHMİNİ ÜRETİM SÜRESİ
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+        <div class="total-value">
+            {saat} saat {dakika} dakika {saniye} saniye
+        </div>
+    </div>
+    """),
+    unsafe_allow_html=True
+)
 
 
     # ========================================================
@@ -823,21 +797,18 @@ if dosya is not None:
     # ========================================================
 
     st.markdown(
-        f"""
-        <div class="total-box">
-
-            <div class="total-title">
-                TAHMİNİ ÜRETİM BİTİŞ ZAMANI
-            </div>
-
-            <div class="total-value">
-                {bitis_metni}
-            </div>
-
+    textwrap.dedent(f"""
+    <div class="total-box">
+        <div class="total-title">
+            TAHMİNİ ÜRETİM BİTİŞ ZAMANI
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+        <div class="total-value">
+            {bitis_metni}
+        </div>
+    </div>
+    """),
+    unsafe_allow_html=True
+)
 
 
     # ========================================================
