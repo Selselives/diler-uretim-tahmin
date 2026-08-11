@@ -8,7 +8,9 @@ Created on Tue Aug 11 08:26:39 2026
 import streamlit as st
 import pandas as pd
 import joblib
+import smtplib
 from io import BytesIO
+from email.message import EmailMessage
 
 st.set_page_config(
     page_title="Diler | Üretim Süresi Tahmin Sistemi",
@@ -173,13 +175,11 @@ if dosya is not None:
             ]
         ].copy()
 
-        # Miktarı sayıya çevir
         yeni["Miktar"] = pd.to_numeric(
             yeni["Miktar"],
             errors="coerce"
         )
 
-        # Tahmin için model verisi
         model_data = pd.get_dummies(
             yeni[
                 [
@@ -199,17 +199,14 @@ if dosya is not None:
             fill_value=0
         )
 
-        # 1 kütük için tahmin
         tahmin = model.predict(model_data)
 
         yeni["TAHMINI_1_KUTUK_SURESI"] = tahmin.round(2)
 
-        # Miktar ile çarp
         yeni["TAHMINI_TOPLAM_SURE"] = (
             tahmin * yeni["Miktar"]
         ).round(2)
 
-        # Toplam süre
         toplam_sure = yeni["TAHMINI_TOPLAM_SURE"].sum()
 
         saat = int(toplam_sure // 3600)
@@ -253,7 +250,7 @@ if dosya is not None:
             unsafe_allow_html=True
         )
 
-        # Excel oluştur
+        # Excel dosyasını oluştur
         sonuc_excel = BytesIO()
 
         with pd.ExcelWriter(
@@ -269,9 +266,72 @@ if dosya is not None:
 
         sonuc_excel.seek(0)
 
+        # Excel indirme
         st.download_button(
             label="Tahmin Sonuçlarını Excel Olarak İndir",
-            data=sonuc_excel,
+            data=sonuc_excel.getvalue(),
             file_name="Diler_Tahmin_Sonuclari.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
+        st.write("")
+
+        # E-POSTA GÖNDER
+        if st.button("📧 E-posta ile Gönder"):
+
+            try:
+                email_address = st.secrets["EMAIL_ADDRESS"]
+                email_password = st.secrets["EMAIL_PASSWORD"]
+                to_email = st.secrets["TO_EMAIL"]
+
+                mesaj = EmailMessage()
+
+                mesaj["Subject"] = "Diler Üretim Süresi Tahmin Sonuçları"
+                mesaj["From"] = email_address
+                mesaj["To"] = to_email
+
+                mesaj.set_content(
+                    f"""
+Merhaba,
+
+Diler Üretim Süresi Tahmin Sistemi tarafından oluşturulan
+tahmin sonuçları ekte paylaşılmıştır.
+
+Toplam tahmini üretim süresi:
+{saat} saat {dakika} dakika {saniye} saniye
+
+İyi çalışmalar.
+"""
+                )
+
+                mesaj.add_attachment(
+                    sonuc_excel.getvalue(),
+                    maintype="application",
+                    subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    filename="Diler_Tahmin_Sonuclari.xlsx"
+                )
+
+                with smtplib.SMTP_SSL(
+                    "smtp.gmail.com",
+                    465
+                ) as server:
+
+                    server.login(
+                        email_address,
+                        email_password
+                    )
+
+                    server.send_message(mesaj)
+
+                st.success(
+                    "E-posta başarıyla gönderildi! ✅"
+                )
+
+            except Exception as e:
+
+                st.error(
+                    "E-posta gönderilemedi. "
+                    "Secrets ayarlarını kontrol edin."
+                )
+
+                st.write(e)
