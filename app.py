@@ -20,6 +20,15 @@ st.set_page_config(
 
 st.markdown(
     """
+    <script>
+        document.title = "Diler | Üretim Süresi Tahmin Sistemi";
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
     <style>
     .stApp {
         background-color: #ffffff;
