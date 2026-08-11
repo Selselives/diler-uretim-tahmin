@@ -11,12 +11,23 @@ import joblib
 import smtplib
 from io import BytesIO
 from email.message import EmailMessage
+from datetime import date, time, datetime, timedelta
+
+
+# ------------------------------------------------
+# SAYFA AYARLARI
+# ------------------------------------------------
 
 st.set_page_config(
     page_title="Diler | Üretim Süresi Tahmin Sistemi",
     page_icon="Diler_Logo_duzeltilmis.png",
     layout="wide"
 )
+
+
+# ------------------------------------------------
+# TASARIM
+# ------------------------------------------------
 
 st.markdown(
     """
@@ -96,11 +107,19 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Logo
-st.image("Diler_Logo_duzeltilmis.png", width=300)
 
-# Başlık
-st.title("Üretim Süresi Tahmin Sistemi")
+# ------------------------------------------------
+# LOGO VE BAŞLIK
+# ------------------------------------------------
+
+st.image(
+    "Diler_Logo_duzeltilmis.png",
+    width=300
+)
+
+st.title(
+    "Üretim Süresi Tahmin Sistemi"
+)
 
 st.markdown(
     '<div class="subtitle">'
@@ -111,12 +130,22 @@ st.markdown(
 
 st.divider()
 
-# Model
+
+# ------------------------------------------------
+# MODEL
+# ------------------------------------------------
+
 model = joblib.load("model.pkl")
 model_columns = joblib.load("model_columns.pkl")
 
-# SAP Excel
-st.subheader("SAP Ürün Listesi")
+
+# ------------------------------------------------
+# SAP EXCEL YÜKLEME
+# ------------------------------------------------
+
+st.subheader(
+    "SAP Ürün Listesi"
+)
 
 st.write(
     "SAP sisteminden alınan Excel dosyasını yükleyerek tahmin işlemini başlatın."
@@ -128,9 +157,15 @@ dosya = st.file_uploader(
     label_visibility="collapsed"
 )
 
+
+# ------------------------------------------------
+# EXCEL YÜKLENDİYSE
+# ------------------------------------------------
+
 if dosya is not None:
 
     df = pd.read_excel(dosya)
+
 
     # ------------------------------------------------
     # YENİ SAP SÜTUNLARI
@@ -143,11 +178,17 @@ if dosya is not None:
         "Kutuk Kalitesi -KUTUK"
     ]
 
-    # Eksik sütun kontrolü
+
+    # ------------------------------------------------
+    # EKSİK SÜTUN KONTROLÜ
+    # ------------------------------------------------
+
     eksik = [
-        sutun for sutun in gerekli_sutunlar
+        sutun
+        for sutun in gerekli_sutunlar
         if sutun not in df.columns
     ]
+
 
     if eksik:
 
@@ -156,31 +197,42 @@ if dosya is not None:
             + ", ".join(eksik)
         )
 
+
     else:
 
-        st.success("Excel başarıyla yüklendi.")
+        st.success(
+            "Excel başarıyla yüklendi."
+        )
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # BİLGİ KARTLARI
-        # --------------------------------------------
+        # ------------------------------------------------
 
         col1, col2 = st.columns(2)
+
 
         with col1:
 
             st.markdown(
                 f"""
                 <div class="card">
-                    <div class="card-title">Ürün / Parti Sayısı</div>
-                    <div class="card-value">{len(df):,}</div>
+                    <div class="card-title">
+                        Ürün / Parti Sayısı
+                    </div>
+
+                    <div class="card-value">
+                        {len(df):,}
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # KULLANICIYA GÖSTERİLECEK VERİ
-        # --------------------------------------------
+        # ------------------------------------------------
 
         yeni = df[
             [
@@ -191,28 +243,45 @@ if dosya is not None:
             ]
         ].copy()
 
-        # Miktarı sayıya çevir
-        yeni["Uretilecek Paket Sayisi -FILMASIN"] = pd.to_numeric(
-            yeni["Uretilecek Paket Sayisi -FILMASIN"],
+
+        # ------------------------------------------------
+        # MİKTARI SAYISAL YAP
+        # ------------------------------------------------
+
+        yeni[
+            "Uretilecek Paket Sayisi -FILMASIN"
+        ] = pd.to_numeric(
+            yeni[
+                "Uretilecek Paket Sayisi -FILMASIN"
+            ],
             errors="coerce"
         )
 
-        # --------------------------------------------
-        # MODEL İÇİN AYRI VERİ SETİ
-        # --------------------------------------------
+
+        # ------------------------------------------------
+        # MODEL İÇİN VERİLERİ ESKİ İSİMLERE ÇEVİR
+        # ------------------------------------------------
 
         model_input = yeni.rename(
             columns={
-                "Filmasin Cap mm -FILMASIN": "Y_CAP_FLM_MM",
-                "Mamul Kalitesi -FILMASIN": "Y_KALITE_FLM",
-                "Uretilecek Paket Sayisi -FILMASIN": "Miktar",
-                "Kutuk Kalitesi -KUTUK": "Y_KALITE_KTK"
+                "Filmasin Cap mm -FILMASIN":
+                    "Y_CAP_FLM_MM",
+
+                "Mamul Kalitesi -FILMASIN":
+                    "Y_KALITE_FLM",
+
+                "Uretilecek Paket Sayisi -FILMASIN":
+                    "Miktar",
+
+                "Kutuk Kalitesi -KUTUK":
+                    "Y_KALITE_KTK"
             }
         )
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # MODEL VERİSİ
-        # --------------------------------------------
+        # ------------------------------------------------
 
         model_data = pd.get_dummies(
             model_input[
@@ -228,44 +297,78 @@ if dosya is not None:
             ]
         )
 
+
         model_data = model_data.reindex(
             columns=model_columns,
             fill_value=0
         )
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # 1 KÜTÜK İÇİN TAHMİN
-        # --------------------------------------------
+        # ------------------------------------------------
 
-        tahmin = model.predict(model_data)
+        tahmin = model.predict(
+            model_data
+        )
 
-        yeni["TAHMINI_1_KUTUK_SURESI"] = tahmin.round(2)
 
-        # --------------------------------------------
-        # MİKTAR İLE ÇARPMA
-        # --------------------------------------------
+        yeni[
+            "TAHMINI_1_KUTUK_SURESI"
+        ] = tahmin.round(2)
 
-        yeni["TAHMINI_TOPLAM_SURE"] = (
-            tahmin *
-            yeni["Uretilecek Paket Sayisi -FILMASIN"]
+
+        # ------------------------------------------------
+        # MİKTAR İLE ÇARP
+        # ------------------------------------------------
+
+        yeni[
+            "TAHMINI_TOPLAM_SURE"
+        ] = (
+            tahmin
+            * yeni[
+                "Uretilecek Paket Sayisi -FILMASIN"
+            ]
         ).round(2)
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # TOPLAM SÜRE
-        # --------------------------------------------
+        # ------------------------------------------------
 
-        toplam_sure = yeni["TAHMINI_TOPLAM_SURE"].sum()
+        toplam_sure = (
+            yeni[
+                "TAHMINI_TOPLAM_SURE"
+            ].sum()
+        )
 
-        saat = int(toplam_sure // 3600)
-        dakika = int((toplam_sure % 3600) // 60)
-        saniye = int(toplam_sure % 60)
+
+        saat = int(
+            toplam_sure // 3600
+        )
+
+        dakika = int(
+            (toplam_sure % 3600) // 60
+        )
+
+        saniye = int(
+            toplam_sure % 60
+        )
+
+
+        # ------------------------------------------------
+        # TOPLAM TAHMİNİ SÜRE KARTI
+        # ------------------------------------------------
 
         with col2:
 
             st.markdown(
                 f"""
                 <div class="card">
-                    <div class="card-title">Toplam Tahmini Süre</div>
+                    <div class="card-title">
+                        Toplam Tahmini Süre
+                    </div>
+
                     <div class="card-value">
                         {saat} sa {dakika} dk
                     </div>
@@ -274,13 +377,86 @@ if dosya is not None:
                 unsafe_allow_html=True
             )
 
+
         st.divider()
 
-        # --------------------------------------------
-        # TAHMİN SONUÇLARI
-        # --------------------------------------------
 
-        st.subheader("Tahmin Sonuçları")
+        # ------------------------------------------------
+        # ÜRETİM BAŞLANGIÇ BİLGİLERİ
+        # ------------------------------------------------
+
+        st.subheader(
+            "Üretim Başlangıç Bilgileri"
+        )
+
+
+        col_tarih, col_saat = st.columns(2)
+
+
+        with col_tarih:
+
+            baslangic_tarihi = st.date_input(
+                "Başlangıç Tarihi",
+                value=date.today()
+            )
+
+
+        with col_saat:
+
+            baslangic_saati = st.time_input(
+                "Başlangıç Saati",
+                value=time(8, 0)
+            )
+
+
+        # ------------------------------------------------
+        # BİTİŞ ZAMANI HESAPLA
+        # ------------------------------------------------
+
+        baslangic_zamani = datetime.combine(
+            baslangic_tarihi,
+            baslangic_saati
+        )
+
+
+        bitis_zamani = (
+            baslangic_zamani
+            + timedelta(
+                seconds=float(toplam_sure)
+            )
+        )
+
+
+        # ------------------------------------------------
+        # TAHMİNİ BİTİŞ ZAMANI
+        # ------------------------------------------------
+
+        st.markdown(
+            f"""
+            <div class="total-box">
+
+                <div class="total-title">
+                    TAHMİNİ ÜRETİM BİTİŞ ZAMANI
+                </div>
+
+                <div class="total-value">
+                    {bitis_zamani.strftime("%d.%m.%Y %H:%M")}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+        # ------------------------------------------------
+        # TAHMİN SONUÇLARI
+        # ------------------------------------------------
+
+        st.subheader(
+            "Tahmin Sonuçları"
+        )
+
 
         st.dataframe(
             yeni,
@@ -288,29 +464,35 @@ if dosya is not None:
             hide_index=True
         )
 
-        # --------------------------------------------
-        # TOPLAM SÜRE KUTUSU
-        # --------------------------------------------
+
+        # ------------------------------------------------
+        # TOPLAM SÜRE
+        # ------------------------------------------------
 
         st.markdown(
             f"""
             <div class="total-box">
+
                 <div class="total-title">
                     TOPLAM TAHMİNİ ÜRETİM SÜRESİ
                 </div>
+
                 <div class="total-value">
                     {saat} saat {dakika} dakika {saniye} saniye
                 </div>
+
             </div>
             """,
             unsafe_allow_html=True
         )
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # EXCEL OLUŞTUR
-        # --------------------------------------------
+        # ------------------------------------------------
 
         sonuc_excel = BytesIO()
+
 
         with pd.ExcelWriter(
             sonuc_excel,
@@ -323,41 +505,65 @@ if dosya is not None:
                 sheet_name="Tahmin Sonuclari"
             )
 
+
         sonuc_excel.seek(0)
 
-        # --------------------------------------------
+
+        # ------------------------------------------------
         # EXCEL İNDİR
-        # --------------------------------------------
+        # ------------------------------------------------
 
         st.download_button(
             label="Tahmin Sonuçlarını Excel Olarak İndir",
+
             data=sonuc_excel.getvalue(),
+
             file_name="Diler_Tahmin_Sonuclari.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            )
         )
+
 
         st.write("")
 
-        # --------------------------------------------
-        # E-POSTA GÖNDER
-        # --------------------------------------------
 
-        if st.button("📧 E-posta ile Gönder"):
+        # ------------------------------------------------
+        # E-POSTA GÖNDER
+        # ------------------------------------------------
+
+        if st.button(
+            "📧 E-posta ile Gönder"
+        ):
 
             try:
 
-                email_address = st.secrets["EMAIL_ADDRESS"]
-                email_password = st.secrets["EMAIL_PASSWORD"]
-                to_email = st.secrets["TO_EMAIL"]
+                email_address = st.secrets[
+                    "EMAIL_ADDRESS"
+                ]
+
+                email_password = st.secrets[
+                    "EMAIL_PASSWORD"
+                ]
+
+                to_email = st.secrets[
+                    "TO_EMAIL"
+                ]
+
 
                 mesaj = EmailMessage()
+
 
                 mesaj["Subject"] = (
                     "Diler Üretim Süresi Tahmin Sonuçları"
                 )
 
                 mesaj["From"] = email_address
+
                 mesaj["To"] = to_email
+
 
                 mesaj.set_content(
                     f"""
@@ -369,19 +575,29 @@ tahmin sonuçları ekte paylaşılmıştır.
 Toplam tahmini üretim süresi:
 {saat} saat {dakika} dakika {saniye} saniye
 
+Tahmini üretim bitiş zamanı:
+{bitis_zamani.strftime("%d.%m.%Y %H:%M")}
+
 İyi çalışmalar.
 """
                 )
 
+
                 mesaj.add_attachment(
                     sonuc_excel.getvalue(),
+
                     maintype="application",
+
                     subtype=(
                         "vnd.openxmlformats-officedocument."
                         "spreadsheetml.sheet"
                     ),
-                    filename="Diler_Tahmin_Sonuclari.xlsx"
+
+                    filename=(
+                        "Diler_Tahmin_Sonuclari.xlsx"
+                    )
                 )
+
 
                 with smtplib.SMTP_SSL(
                     "smtp.gmail.com",
@@ -393,11 +609,15 @@ Toplam tahmini üretim süresi:
                         email_password
                     )
 
-                    server.send_message(mesaj)
+                    server.send_message(
+                        mesaj
+                    )
+
 
                 st.success(
                     "E-posta başarıyla gönderildi! ✅"
                 )
+
 
             except Exception as e:
 
