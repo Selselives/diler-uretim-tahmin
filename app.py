@@ -10,188 +10,110 @@ import pandas as pd
 import joblib
 from io import BytesIO
 
-# -------------------------------------------------
-# SAYFA AYARLARI
-# -------------------------------------------------
-
 st.set_page_config(
     page_title="Diler | Üretim Süresi Tahmin Sistemi",
-    page_icon="Diler_Logo.png",
+    page_icon="Diler_Logo_duzeltilmis.png",
     layout="wide"
 )
 
-# -------------------------------------------------
-# TASARIM
-# -------------------------------------------------
-
-st.markdown("""
-<style>
-
-    /* Genel sayfa */
+st.markdown(
+    """
+    <style>
     .stApp {
         background-color: #ffffff;
     }
 
     .block-container {
         max-width: 1200px;
-        padding-top: 2rem;
-        padding-bottom: 4rem;
+        padding-top: 40px;
     }
 
-    /* Üst logo alanı */
-    .logo-area {
-        display: flex;
-        align-items: center;
-        padding: 10px 0 25px 0;
-        border-bottom: 1px solid #eeeeee;
-        margin-bottom: 45px;
+    h1 {
+        color: #1239A6;
+        font-size: 46px !important;
+        font-weight: 700 !important;
     }
 
-    /* Ana başlık */
-    .main-title {
-        color: #1239a6;
-        font-size: 48px;
-        font-weight: 700;
-        line-height: 1.1;
-        margin-bottom: 10px;
+    h2, h3 {
+        color: #172033;
     }
 
     .subtitle {
-        color: #5f6470;
+        color: #6B7280;
         font-size: 18px;
-        margin-bottom: 40px;
+        margin-bottom: 35px;
     }
 
-    /* Bölüm başlıkları */
-    .section-title {
-        color: #172033;
-        font-size: 28px;
-        font-weight: 700;
-        margin-top: 30px;
-        margin-bottom: 8px;
-    }
-
-    .section-text {
-        color: #6b7280;
-        font-size: 16px;
+    .card {
+        background-color: #F4F6FB;
+        border: 1px solid #E1E5EF;
+        border-radius: 15px;
+        padding: 22px;
         margin-bottom: 20px;
     }
 
-    /* Bilgi kartları */
-    .metric-card {
-        background: #f5f7fc;
-        border-radius: 16px;
-        padding: 25px;
-        border: 1px solid #e5e8f0;
-        height: 100%;
-    }
-
-    .metric-title {
-        color: #6b7280;
+    .card-title {
+        color: #6B7280;
         font-size: 15px;
-        margin-bottom: 8px;
     }
 
-    .metric-value {
-        color: #1239a6;
-        font-size: 32px;
+    .card-value {
+        color: #1239A6;
+        font-size: 30px;
         font-weight: 700;
     }
 
-    /* Sonuç kutusu */
-    .result-box {
-        background: #1239a6;
-        border-radius: 18px;
-        padding: 28px;
+    .total-box {
+        background-color: #1239A6;
         color: white;
-        margin-top: 25px;
-        margin-bottom: 30px;
+        border-radius: 15px;
+        padding: 25px;
+        margin-top: 20px;
+        margin-bottom: 25px;
     }
 
-    .result-title {
-        font-size: 16px;
-        opacity: 0.85;
+    .total-title {
+        font-size: 15px;
     }
 
-    .result-value {
-        font-size: 34px;
+    .total-value {
+        font-size: 30px;
         font-weight: 700;
-        margin-top: 5px;
     }
 
-    /* Streamlit buton */
-    .stDownloadButton > button {
-        background-color: #1239a6 !important;
+    .stDownloadButton button {
+        background-color: #1239A6 !important;
         color: white !important;
+        border-radius: 25px !important;
         border: none !important;
-        border-radius: 30px !important;
-        padding: 12px 28px !important;
+        padding: 10px 25px !important;
         font-weight: 600 !important;
-        font-size: 16px !important;
     }
-
-    .stDownloadButton > button:hover {
-        background-color: #0d2d85 !important;
-    }
-
-    /* Dosya yükleme alanı */
-    [data-testid="stFileUploader"] {
-        background-color: #f5f7fc;
-        border: 2px dashed #cbd3e6;
-        border-radius: 18px;
-        padding: 20px;
-    }
-
-</style>
-""", unsafe_allow_html=True)
-
-
-# -------------------------------------------------
-# LOGO
-# -------------------------------------------------
-
-st.image("Diler_Logo_duzeltilmis.png", width=300)
-
-
-# -------------------------------------------------
-# BAŞLIK
-# -------------------------------------------------
-
-st.markdown(
-    '<div class="main-title">Üretim Süresi<br>Tahmin Sistemi</div>',
+    </style>
+    """,
     unsafe_allow_html=True
 )
 
+st.image("Diler_Logo_duzeltilmis.png", width=300)
+
+st.title("Üretim Süresi Tahmin Sistemi")
+
 st.markdown(
     '<div class="subtitle">'
-    'SAP üretim verileri kullanılarak ürün bazında tahmini üretim sürelerini hesaplayın.'
+    'SAP üretim verileri kullanılarak ürün bazında tahmini üretim sürelerinin hesaplanması'
     '</div>',
     unsafe_allow_html=True
 )
 
-
-# -------------------------------------------------
-# MODEL
-# -------------------------------------------------
+st.divider()
 
 model = joblib.load("model.pkl")
 model_columns = joblib.load("model_columns.pkl")
 
+st.subheader("SAP Ürün Listesi")
 
-# -------------------------------------------------
-# EXCEL YÜKLEME
-# -------------------------------------------------
-
-st.markdown(
-    '<div class="section-title">SAP Ürün Listesi</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    '<div class="section-text">'
-    'SAP sisteminden alınan Excel dosyasını yükleyerek tahmin işlemini başlatın.'
-    '</div>',
-    unsafe_allow_html=True
+st.write(
+    "SAP sisteminden alınan Excel dosyasını yükleyerek tahmin işlemini başlatın."
 )
 
 dosya = st.file_uploader(
@@ -199,11 +121,6 @@ dosya = st.file_uploader(
     type=["xlsx"],
     label_visibility="collapsed"
 )
-
-
-# -------------------------------------------------
-# DOSYA YÜKLENDİ
-# -------------------------------------------------
 
 if dosya is not None:
 
@@ -213,7 +130,8 @@ if dosya is not None:
         "KTKID",
         "Y_CAP_FLM_MM",
         "Y_KALITE_FLM",
-        "Y_KALITE_KTK"
+        "Y_KALITE_KTK",
+        "Miktar"
     ]
 
     eksik = [
@@ -224,7 +142,7 @@ if dosya is not None:
     if eksik:
 
         st.error(
-            "Excel dosyasında gerekli sütunlar bulunamadı: "
+            "Excel dosyasında şu sütunlar eksik: "
             + ", ".join(eksik)
         )
 
@@ -232,37 +150,36 @@ if dosya is not None:
 
         st.success("Excel başarıyla yüklendi.")
 
-        # -----------------------------------------
-        # BİLGİ KARTLARI
-        # -----------------------------------------
-
         col1, col2 = st.columns(2)
 
         with col1:
-
             st.markdown(
                 f"""
-                <div class="metric-card">
-                    <div class="metric-title">Ürün Sayısı</div>
-                    <div class="metric-value">{len(df):,}</div>
+                <div class="card">
+                    <div class="card-title">Ürün / Parti Sayısı</div>
+                    <div class="card-value">{len(df):,}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-
-        # -----------------------------------------
-        # MODEL VERİSİ
-        # -----------------------------------------
 
         yeni = df[
             [
                 "KTKID",
                 "Y_CAP_FLM_MM",
                 "Y_KALITE_FLM",
-                "Y_KALITE_KTK"
+                "Y_KALITE_KTK",
+                "Miktar"
             ]
         ].copy()
 
+        # Miktarı sayıya çevir
+        yeni["Miktar"] = pd.to_numeric(
+            yeni["Miktar"],
+            errors="coerce"
+        )
+
+        # Tahmin için model verisi
         model_data = pd.get_dummies(
             yeni[
                 [
@@ -282,29 +199,29 @@ if dosya is not None:
             fill_value=0
         )
 
-        # -----------------------------------------
-        # TAHMİN
-        # -----------------------------------------
-
+        # 1 kütük için tahmin
         tahmin = model.predict(model_data)
 
-        yeni["TAHMINI_URUN_SURESI"] = tahmin.round(2)
+        yeni["TAHMINI_1_KUTUK_SURESI"] = tahmin.round(2)
 
-        toplam_sure = tahmin.sum()
+        # Miktar ile çarp
+        yeni["TAHMINI_TOPLAM_SURE"] = (
+            tahmin * yeni["Miktar"]
+        ).round(2)
+
+        # Toplam süre
+        toplam_sure = yeni["TAHMINI_TOPLAM_SURE"].sum()
 
         saat = int(toplam_sure // 3600)
         dakika = int((toplam_sure % 3600) // 60)
         saniye = int(toplam_sure % 60)
 
         with col2:
-
             st.markdown(
                 f"""
-                <div class="metric-card">
-                    <div class="metric-title">
-                        Toplam Tahmini Süre
-                    </div>
-                    <div class="metric-value">
+                <div class="card">
+                    <div class="card-title">Toplam Tahmini Süre</div>
+                    <div class="card-value">
                         {saat} sa {dakika} dk
                     </div>
                 </div>
@@ -312,14 +229,9 @@ if dosya is not None:
                 unsafe_allow_html=True
             )
 
-        # -----------------------------------------
-        # SONUÇ
-        # -----------------------------------------
+        st.divider()
 
-        st.markdown(
-            '<div class="section-title">Tahmin Sonuçları</div>',
-            unsafe_allow_html=True
-        )
+        st.subheader("Tahmin Sonuçları")
 
         st.dataframe(
             yeni,
@@ -327,17 +239,13 @@ if dosya is not None:
             hide_index=True
         )
 
-        # -----------------------------------------
-        # TOPLAM SÜRE
-        # -----------------------------------------
-
         st.markdown(
             f"""
-            <div class="result-box">
-                <div class="result-title">
+            <div class="total-box">
+                <div class="total-title">
                     TOPLAM TAHMİNİ ÜRETİM SÜRESİ
                 </div>
-                <div class="result-value">
+                <div class="total-value">
                     {saat} saat {dakika} dakika {saniye} saniye
                 </div>
             </div>
@@ -345,10 +253,7 @@ if dosya is not None:
             unsafe_allow_html=True
         )
 
-        # -----------------------------------------
-        # EXCEL OLUŞTUR
-        # -----------------------------------------
-
+        # Excel oluştur
         sonuc_excel = BytesIO()
 
         with pd.ExcelWriter(
