@@ -317,6 +317,130 @@ if dosya is not None:
             columns=model_columns,
             fill_value=0
         )
+        # ------------------------------------------------
+        # EĞİTİM VERİSİNDE BULUNAN KOMBİNASYONLARI KONTROL ET
+        # ------------------------------------------------
+
+gecerli_satirlar = []
+
+for _, satir in yeni.iterrows():
+
+    kombinasyon = (
+        satir["Filmasin Cap mm -FILMASIN"],
+        satir["Mamul Kalitesi -FILMASIN"],
+        satir["Kutuk Kalitesi -KUTUK"]
+    )
+
+    gecerli_satirlar.append(
+        kombinasyon in gecerli_kombinasyonlar
+    )
+
+yeni["TAHMIN_YAPILABILIR"] = gecerli_satirlar
+
+
+# ------------------------------------------------
+# TAHMİN SÜTUNLARINI OLUŞTUR
+# ------------------------------------------------
+
+yeni["TAHMINI_1_KUTUK_SURESI"] = "Tahmin yapılamadı"
+
+yeni["TAHMINI_TOPLAM_SURE"] = 0.0
+
+
+# ------------------------------------------------
+# SADECE GEÇERLİ KOMBİNASYONLARI TAHMİN ET
+# ------------------------------------------------
+
+gecerli_index = yeni.index[
+    yeni["TAHMIN_YAPILABILIR"]
+]
+
+
+if len(gecerli_index) > 0:
+
+    model_tahmin_data = model_data.loc[
+        gecerli_index
+    ]
+
+    tahmin = model.predict(
+        model_tahmin_data
+    )
+
+    tahmin = tahmin.flatten()
+
+
+    for i, index in enumerate(gecerli_index):
+
+        yeni.at[
+            index,
+            "TAHMINI_1_KUTUK_SURESI"
+        ] = round(
+            float(tahmin[i]),
+            2
+        )
+
+        yeni.at[
+            index,
+            "TAHMINI_TOPLAM_SURE"
+        ] = round(
+            float(tahmin[i])
+            * float(
+                yeni.at[
+                    index,
+                    "Uretilecek Paket Sayisi -FILMASIN"
+                ]
+            ),
+            2
+        )
+
+
+# ------------------------------------------------
+# TOPLAM SÜRE
+# ------------------------------------------------
+
+toplam_sure = (
+    yeni[
+        "TAHMINI_TOPLAM_SURE"
+    ].sum()
+)
+
+
+saat = int(
+    toplam_sure // 3600
+)
+
+dakika = int(
+    (toplam_sure % 3600) // 60
+)
+
+saniye = int(
+    toplam_sure % 60
+)
+
+
+# ------------------------------------------------
+# TAHMİN DURUMU
+# ------------------------------------------------
+
+tahmin_yapilamayan = (
+    (~yeni["TAHMIN_YAPILABILIR"]).sum()
+)
+
+tahmin_yapilabilen = (
+    yeni["TAHMIN_YAPILABILIR"].sum()
+)
+
+
+if tahmin_yapilamayan > 0:
+
+    st.warning(
+        f"⚠️ {tahmin_yapilamayan} ürün için tahmin "
+        f"oluşturulamadı. Bu ürünlerin çap / mamul kalitesi / "
+        f"kütük kalitesi kombinasyonları eğitim verilerinde "
+        f"bulunmamaktadır. Toplam süre yalnızca tahmin "
+        f"yapılabilen {tahmin_yapilabilen} ürün üzerinden "
+        f"hesaplanmıştır."
+    )
 
 
     # ------------------------------------------------
