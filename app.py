@@ -9,10 +9,11 @@ import streamlit as st
 import pandas as pd
 import joblib
 import smtplib
+import os
 
 from io import BytesIO
 from email.message import EmailMessage
-from datetime import date, time, datetime, timedelta
+from datetime import datetime, date, time, timedelta
 
 
 # ============================================================
@@ -21,13 +22,13 @@ from datetime import date, time, datetime, timedelta
 
 st.set_page_config(
     page_title="Diler | Üretim Süresi Tahmin Sistemi",
-    page_icon="Diler_Logo_duzeltilmis.png",
+    page_icon="🔷",
     layout="wide"
 )
 
 
 # ============================================================
-# TASARIM
+# BASİT TASARIM
 # ============================================================
 
 st.markdown(
@@ -41,68 +42,6 @@ st.markdown(
     .block-container {
         max-width: 1200px;
         padding-top: 40px;
-    }
-
-    h1 {
-        color: #1239A6;
-        font-size: 46px !important;
-        font-weight: 700 !important;
-    }
-
-    h2, h3 {
-        color: #172033;
-    }
-
-    .subtitle {
-        color: #6B7280;
-        font-size: 18px;
-        margin-bottom: 35px;
-    }
-
-    .card {
-        background-color: #F4F6FB;
-        border: 1px solid #E1E5EF;
-        border-radius: 15px;
-        padding: 22px;
-        margin-bottom: 20px;
-    }
-
-    .card-title {
-        color: #6B7280;
-        font-size: 15px;
-    }
-
-    .card-value {
-        color: #1239A6;
-        font-size: 30px;
-        font-weight: 700;
-    }
-
-    .total-box {
-        background-color: #1239A6;
-        color: white;
-        border-radius: 15px;
-        padding: 25px;
-        margin-top: 20px;
-        margin-bottom: 25px;
-    }
-
-    .total-title {
-        font-size: 15px;
-    }
-
-    .total-value {
-        font-size: 30px;
-        font-weight: 700;
-    }
-
-    .stDownloadButton button {
-        background-color: #1239A6 !important;
-        color: white !important;
-        border-radius: 25px !important;
-        border: none !important;
-        padding: 10px 25px !important;
-        font-weight: 600 !important;
     }
 
     </style>
@@ -120,17 +59,11 @@ st.image(
     width=300
 )
 
-st.title(
-    "Üretim Süresi Tahmin Sistemi"
-)
+st.title("Üretim Süresi Tahmin Sistemi")
 
-st.markdown(
-    """
-    <div class="subtitle">
-    SAP üretim verileri kullanılarak ürün bazında tahmini üretim sürelerinin hesaplanması
-    </div>
-    """,
-    unsafe_allow_html=True
+st.write(
+    "SAP üretim verileri kullanılarak ürün bazında "
+    "tahmini üretim sürelerinin hesaplanması"
 )
 
 st.divider()
@@ -140,123 +73,175 @@ st.divider()
 # MODELİ YÜKLE
 # ============================================================
 
-model = joblib.load(
-    "model.pkl"
-)
-
-model_columns = joblib.load(
-    "model_columns.pkl"
-)
+model = joblib.load("model.pkl")
+model_columns = joblib.load("model_columns.pkl")
 
 
 # ============================================================
 # EĞİTİM VERİSİNİ YÜKLE
 # ============================================================
 
-try:
+egitim_dosyasi = "Diler Proje Verileri.xlsx"
 
-    egitim_verisi = pd.read_excel(
-        "Diler Proje Verileri.xlsx"
-    )
-
-except FileNotFoundError:
+if not os.path.exists(egitim_dosyasi):
 
     st.error(
-        "Diler Proje Verileri.xlsx dosyası bulunamadı. "
-        "Bu dosyanın GitHub repository içerisinde app.py ile "
-        "aynı klasörde bulunması gerekiyor."
+        f"'{egitim_dosyasi}' dosyası uygulamanın bulunduğu "
+        "GitHub klasöründe bulunamadı."
+    )
+
+    st.info(
+        "Bu dosyayı app.py, model.pkl ve model_columns.pkl "
+        "ile aynı klasöre yüklemen gerekiyor."
     )
 
     st.stop()
 
 
+egitim_verisi = pd.read_excel(
+    egitim_dosyasi
+)
+
+
 # ============================================================
-# EĞİTİM VERİSİ SÜTUN KONTROLÜ
+# EĞİTİM VERİSİNDEKİ SÜTUNLARI BELİRLE
 # ============================================================
 
-egitim_gerekli_sutunlar = [
+# Yeni sütun isimleri
+yeni_sutunlar = [
+    "Filmasin Cap mm -FILMASIN",
+    "Mamul Kalitesi -FILMASIN",
+    "Uretilecek Paket Sayisi -FILMASIN",
+    "Kutuk Kalitesi -KUTUK"
+]
+
+# Eski/model sütun isimleri
+eski_sutunlar = [
     "Y_CAP_FLM_MM",
     "Y_KALITE_FLM",
+    "Miktar",
     "Y_KALITE_KTK"
 ]
 
-egitim_eksik = [
-    sutun
-    for sutun in egitim_gerekli_sutunlar
-    if sutun not in egitim_verisi.columns
-]
 
-if egitim_eksik:
+# Eğitim dosyasında yeni isimler varsa
+if all(
+    sutun in egitim_verisi.columns
+    for sutun in yeni_sutunlar
+):
+
+    egitim_kombinasyonlari = egitim_verisi[
+        [
+            "Filmasin Cap mm -FILMASIN",
+            "Mamul Kalitesi -FILMASIN",
+            "Kutuk Kalitesi -KUTUK"
+        ]
+    ].copy()
+
+# Eğitim dosyasında model isimleri varsa
+elif all(
+    sutun in egitim_verisi.columns
+    for sutun in eski_sutunlar
+):
+
+    egitim_kombinasyonlari = egitim_verisi[
+        [
+            "Y_CAP_FLM_MM",
+            "Y_KALITE_FLM",
+            "Y_KALITE_KTK"
+        ]
+    ].copy()
+
+    egitim_kombinasyonlari = egitim_kombinasyonlari.rename(
+        columns={
+            "Y_CAP_FLM_MM": "Filmasin Cap mm -FILMASIN",
+            "Y_KALITE_FLM": "Mamul Kalitesi -FILMASIN",
+            "Y_KALITE_KTK": "Kutuk Kalitesi -KUTUK"
+        }
+    )
+
+else:
 
     st.error(
-        "Diler Proje Verileri.xlsx dosyasında şu sütunlar eksik: "
-        + ", ".join(egitim_eksik)
+        "Diler Proje Verileri.xlsx içerisinde gerekli "
+        "çap ve kalite sütunları bulunamadı."
     )
 
     st.stop()
 
 
 # ============================================================
-# KARŞILAŞTIRMA İÇİN TEMİZLEME FONKSİYONLARI
+# GEÇERLİ KOMBİNASYONLARI TEMİZLE
 # ============================================================
 
-def temiz_deger(deger):
-
-    if pd.isna(deger):
-        return None
-
-    return str(deger).strip().upper()
-
-
-def temiz_cap(deger):
-
-    if pd.isna(deger):
-        return None
-
-    try:
-        return round(float(deger), 6)
-
-    except:
-        return None
+egitim_kombinasyonlari = (
+    egitim_kombinasyonlari
+    .dropna()
+    .drop_duplicates()
+    .copy()
+)
 
 
-# ============================================================
-# EĞİTİM VERİSİNDE BULUNAN GEÇERLİ KOMBİNASYONLAR
-# ============================================================
+# Karşılaştırmanın daha sağlıklı olması için
+# metin alanlarını string yapıyoruz.
 
-gecerli_kombinasyonlar = set()
+egitim_kombinasyonlari[
+    "Mamul Kalitesi -FILMASIN"
+] = (
+    egitim_kombinasyonlari[
+        "Mamul Kalitesi -FILMASIN"
+    ]
+    .astype(str)
+    .str.strip()
+)
 
-for _, satir in egitim_verisi.iterrows():
+egitim_kombinasyonlari[
+    "Kutuk Kalitesi -KUTUK"
+] = (
+    egitim_kombinasyonlari[
+        "Kutuk Kalitesi -KUTUK"
+    ]
+    .astype(str)
+    .str.strip()
+)
 
-    kombinasyon = (
-        temiz_cap(
-            satir["Y_CAP_FLM_MM"]
-        ),
 
-        temiz_deger(
-            satir["Y_KALITE_FLM"]
-        ),
+# Çapı sayısal yap
+egitim_kombinasyonlari[
+    "Filmasin Cap mm -FILMASIN"
+] = pd.to_numeric(
+    egitim_kombinasyonlari[
+        "Filmasin Cap mm -FILMASIN"
+    ],
+    errors="coerce"
+)
 
-        temiz_deger(
-            satir["Y_KALITE_KTK"]
-        )
+
+# Geçerli kombinasyonları set haline getir
+gecerli_kombinasyonlar = set(
+    zip(
+        egitim_kombinasyonlari[
+            "Filmasin Cap mm -FILMASIN"
+        ],
+        egitim_kombinasyonlari[
+            "Mamul Kalitesi -FILMASIN"
+        ],
+        egitim_kombinasyonlari[
+            "Kutuk Kalitesi -KUTUK"
+        ]
     )
-
-    gecerli_kombinasyonlar.add(
-        kombinasyon
-    )
+)
 
 
 # ============================================================
 # SAP ÜRÜN LİSTESİ
 # ============================================================
 
-st.subheader(
-    "SAP Ürün Listesi"
-)
+st.subheader("SAP Ürün Listesi")
 
 st.write(
-    "SAP sisteminden alınan Excel dosyasını yükleyerek tahmin işlemini başlatın."
+    "SAP sisteminden alınan Excel dosyasını yükleyerek "
+    "tahmin işlemini başlatın."
 )
 
 
@@ -268,19 +253,21 @@ dosya = st.file_uploader(
 
 
 # ============================================================
-# EXCEL YÜKLENDİYSE
+# DOSYA YÜKLENDİYSE
 # ============================================================
 
 if dosya is not None:
 
-    df = pd.read_excel(
-        dosya
-    )
+    # --------------------------------------------------------
+    # EXCEL OKU
+    # --------------------------------------------------------
+
+    df = pd.read_excel(dosya)
 
 
-    # ========================================================
-    # SAP EXCELİNDE OLMASI GEREKEN SÜTUNLAR
-    # ========================================================
+    # --------------------------------------------------------
+    # GEREKLİ SÜTUNLAR
+    # --------------------------------------------------------
 
     gerekli_sutunlar = [
         "Filmasin Cap mm -FILMASIN",
@@ -307,40 +294,41 @@ if dosya is not None:
         st.stop()
 
 
-    st.success(
-        "Excel başarıyla yüklendi."
-    )
+    # --------------------------------------------------------
+    # BAŞARILI YÜKLEME
+    # --------------------------------------------------------
+
+    st.success("Excel başarıyla yüklendi.")
 
 
-    # ========================================================
-    # BİLGİ KARTLARI
-    # ========================================================
+    # --------------------------------------------------------
+    # ÜRÜN SAYISI VE BAŞLANGIÇ ZAMANI
+    # --------------------------------------------------------
 
     col1, col2 = st.columns(2)
 
 
     with col1:
 
-        st.markdown(
-            f"""
-            <div class="card">
-
-                <div class="card-title">
-                    Ürün / Parti Sayısı
-                </div>
-
-                <div class="card-value">
-                    {len(df):,}
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
+        st.metric(
+            "Ürün / Parti Sayısı",
+            f"{len(df):,}"
         )
 
 
+    with col2:
+
+        st.metric(
+            "Eğitim Verisindeki Geçerli Kombinasyon",
+            f"{len(gecerli_kombinasyonlar):,}"
+        )
+
+
+    st.divider()
+
+
     # ========================================================
-    # SADECE GEREKLİ SÜTUNLARI AL
+    # KULLANICI VERİSİNİ HAZIRLA
     # ========================================================
 
     yeni = df[
@@ -353,9 +341,19 @@ if dosya is not None:
     ].copy()
 
 
-    # ========================================================
-    # MİKTARI SAYISAL YAP
-    # ========================================================
+    # --------------------------------------------------------
+    # SAYISAL ALANLAR
+    # --------------------------------------------------------
+
+    yeni[
+        "Filmasin Cap mm -FILMASIN"
+    ] = pd.to_numeric(
+        yeni[
+            "Filmasin Cap mm -FILMASIN"
+        ],
+        errors="coerce"
+    )
+
 
     yeni[
         "Uretilecek Paket Sayisi -FILMASIN"
@@ -367,90 +365,50 @@ if dosya is not None:
     )
 
 
-    # ========================================================
-    # MODEL İÇİN SÜTUNLARI ESKİ İSİMLERE ÇEVİR
-    # ========================================================
+    # --------------------------------------------------------
+    # KALİTE ALANLARI
+    # --------------------------------------------------------
 
-    model_input = yeni.rename(
-        columns={
-            "Filmasin Cap mm -FILMASIN":
-                "Y_CAP_FLM_MM",
-
-            "Mamul Kalitesi -FILMASIN":
-                "Y_KALITE_FLM",
-
-            "Uretilecek Paket Sayisi -FILMASIN":
-                "Miktar",
-
-            "Kutuk Kalitesi -KUTUK":
-                "Y_KALITE_KTK"
-        }
-    )
-
-
-    # ========================================================
-    # MODEL VERİSİ OLUŞTUR
-    # ========================================================
-
-    model_data = pd.get_dummies(
-        model_input[
-            [
-                "Y_CAP_FLM_MM",
-                "Y_KALITE_FLM",
-                "Y_KALITE_KTK"
-            ]
-        ],
-        columns=[
-            "Y_KALITE_FLM",
-            "Y_KALITE_KTK"
+    yeni[
+        "Mamul Kalitesi -FILMASIN"
+    ] = (
+        yeni[
+            "Mamul Kalitesi -FILMASIN"
         ]
+        .astype(str)
+        .str.strip()
     )
-
-
-    model_data = model_data.reindex(
-        columns=model_columns,
-        fill_value=0
-    )
-
-
-    # ========================================================
-    # EĞİTİM VERİSİNDE VAR MI KONTROLÜ
-    # ========================================================
-
-    gecerli_durumlar = []
-
-
-    for _, satir in yeni.iterrows():
-
-        kombinasyon = (
-            temiz_cap(
-                satir[
-                    "Filmasin Cap mm -FILMASIN"
-                ]
-            ),
-
-            temiz_deger(
-                satir[
-                    "Mamul Kalitesi -FILMASIN"
-                ]
-            ),
-
-            temiz_deger(
-                satir[
-                    "Kutuk Kalitesi -KUTUK"
-                ]
-            )
-        )
-
-
-        gecerli_durumlar.append(
-            kombinasyon in gecerli_kombinasyonlar
-        )
 
 
     yeni[
-        "TAHMIN_YAPILABILIR"
-    ] = gecerli_durumlar
+        "Kutuk Kalitesi -KUTUK"
+    ] = (
+        yeni[
+            "Kutuk Kalitesi -KUTUK"
+        ]
+        .astype(str)
+        .str.strip()
+    )
+
+
+    # ========================================================
+    # KOMBİNASYON KONTROLÜ
+    # ========================================================
+
+    yeni["TAHMIN_YAPILABILIR"] = yeni.apply(
+        lambda satir: (
+            satir[
+                "Filmasin Cap mm -FILMASIN"
+            ],
+            satir[
+                "Mamul Kalitesi -FILMASIN"
+            ],
+            satir[
+                "Kutuk Kalitesi -KUTUK"
+            ]
+        ) in gecerli_kombinasyonlar,
+        axis=1
+    )
 
 
     # ========================================================
@@ -459,11 +417,7 @@ if dosya is not None:
 
     yeni[
         "TAHMINI_1_KUTUK_SURESI"
-    ] = pd.Series(
-        [None] * len(yeni),
-        index=yeni.index,
-        dtype="object"
-    )
+    ] = "Tahmin yapılamadı"
 
 
     yeni[
@@ -471,96 +425,156 @@ if dosya is not None:
     ] = 0.0
 
 
-    yeni[
-        "TAHMIN_DURUMU"
-    ] = "Tahmin yapılamadı"
-
-
     # ========================================================
-    # SADECE GEÇERLİ SATIRLARI TAHMİN ET
+    # SADECE GEÇERLİ KOMBİNASYONLARI TAHMİN ET
     # ========================================================
 
-    gecerli_pozisyonlar = [
-        i
-        for i, durum in enumerate(
-            yeni[
-                "TAHMIN_YAPILABILIR"
-            ]
-        )
-        if durum
+    gecerli_index = yeni.index[
+        yeni["TAHMIN_YAPILABILIR"]
     ]
 
 
-    if len(gecerli_pozisyonlar) > 0:
+    if len(gecerli_index) > 0:
 
-        model_tahmin_data = model_data.iloc[
-            gecerli_pozisyonlar
-        ]
+        tahmin_verisi = yeni.loc[
+            gecerli_index,
+            [
+                "Filmasin Cap mm -FILMASIN",
+                "Mamul Kalitesi -FILMASIN",
+                "Kutuk Kalitesi -KUTUK"
+            ]
+        ].copy()
 
 
-        tahmin = model.predict(
-            model_tahmin_data
+        # ----------------------------------------------------
+        # MODEL İÇİN ESKİ İSİMLERE ÇEVİR
+        # ----------------------------------------------------
+
+        model_input = tahmin_verisi.rename(
+            columns={
+                "Filmasin Cap mm -FILMASIN":
+                    "Y_CAP_FLM_MM",
+
+                "Mamul Kalitesi -FILMASIN":
+                    "Y_KALITE_FLM",
+
+                "Kutuk Kalitesi -KUTUK":
+                    "Y_KALITE_KTK"
+            }
         )
 
 
-        tahmin = tahmin.flatten()
+        # ----------------------------------------------------
+        # ONE-HOT ENCODING
+        # ----------------------------------------------------
 
-
-        # ====================================================
-        # TAHMİNLERİ SATIRLARA YAZ
-        # ====================================================
-
-        for sira, pozisyon in enumerate(
-            gecerli_pozisyonlar
-        ):
-
-            index = yeni.index[
-                pozisyon
-            ]
-
-
-            bir_kutuk_suresi = float(
-                tahmin[sira]
-            )
-
-
-            miktar = float(
-                yeni.iloc[
-                    pozisyon
-                ][
-                    "Uretilecek Paket Sayisi -FILMASIN"
+        model_data = pd.get_dummies(
+            model_input[
+                [
+                    "Y_CAP_FLM_MM",
+                    "Y_KALITE_FLM",
+                    "Y_KALITE_KTK"
                 ]
-            )
+            ],
+            columns=[
+                "Y_KALITE_FLM",
+                "Y_KALITE_KTK"
+            ]
+        )
 
 
-            toplam_satir_suresi = (
-                bir_kutuk_suresi
-                * miktar
-            )
+        # ----------------------------------------------------
+        # MODEL SÜTUNLARIYLA EŞLEŞTİR
+        # ----------------------------------------------------
+
+        model_data = model_data.reindex(
+            columns=model_columns,
+            fill_value=0
+        )
 
 
-            yeni.at[
-                index,
-                "TAHMINI_1_KUTUK_SURESI"
-            ] = round(
-                bir_kutuk_suresi,
-                2
-            )
+        # ----------------------------------------------------
+        # TAHMİN
+        # ----------------------------------------------------
+
+        tahmin = model.predict(
+            model_data
+        )
 
 
-            yeni.at[
-                index,
-                "TAHMINI_TOPLAM_SURE"
-            ] = round(
-                toplam_satir_suresi,
-                2
-            )
+        # ----------------------------------------------------
+        # 1 KÜTÜK SÜRESİ
+        # ----------------------------------------------------
+
+        yeni.loc[
+            gecerli_index,
+            "TAHMINI_1_KUTUK_SURESI"
+        ] = pd.Series(
+            tahmin.round(2),
+            index=gecerli_index
+        )
 
 
-            yeni.at[
-                index,
-                "TAHMIN_DURUMU"
-            ] = "Tahmin oluşturuldu"
+        # ----------------------------------------------------
+        # MİKTAR İLE ÇARP
+        # ----------------------------------------------------
+
+        toplam_tahminler = (
+            tahmin
+            * yeni.loc[
+                gecerli_index,
+                "Uretilecek Paket Sayisi -FILMASIN"
+            ].values
+        )
+
+
+        yeni.loc[
+            gecerli_index,
+            "TAHMINI_TOPLAM_SURE"
+        ] = pd.Series(
+            toplam_tahminler.round(2),
+            index=gecerli_index
+        )
+
+
+    # ========================================================
+    # TAHMİN SAYILARI
+    # ========================================================
+
+    tahmin_yapilabilen = int(
+        yeni["TAHMIN_YAPILABILIR"].sum()
+    )
+
+
+    tahmin_yapilamayan = (
+        len(yeni)
+        - tahmin_yapilabilen
+    )
+
+
+    # ========================================================
+    # UYARI
+    # ========================================================
+
+    if tahmin_yapilamayan > 0:
+
+        st.warning(
+            f"⚠️ {tahmin_yapilamayan} ürün için tahmin "
+            f"oluşturulamadı. Bu ürünlerin çap + mamul "
+            f"kalitesi + kütük kalitesi kombinasyonu "
+            f"Diler Proje Verileri eğitim verisinde "
+            f"bulunmamaktadır. "
+            f"Toplam süre yalnızca tahmin yapılabilen "
+            f"{tahmin_yapilabilen} ürün üzerinden "
+            f"hesaplanmıştır."
+        )
+
+    else:
+
+        st.success(
+            "Tüm ürünler için eğitim verisinde bulunan "
+            "kombinasyonlara göre tahmin oluşturuldu."
+        )
 
 
     # ========================================================
@@ -590,86 +604,31 @@ if dosya is not None:
 
 
     # ========================================================
-    # TAHMİN DURUM SAYILARI
+    # TOPLAM SÜRE GÖSTER
     # ========================================================
 
-    tahmin_yapilabilen = int(
-        yeni[
-            "TAHMIN_YAPILABILIR"
-        ].sum()
+    st.metric(
+        "Toplam Tahmini Üretim Süresi",
+        f"{saat} sa {dakika} dk {saniye} sn"
     )
 
 
-    tahmin_yapilamayan = (
-        len(yeni)
-        - tahmin_yapilabilen
-    )
-
-
-    # ========================================================
-    # KULLANICIYA BİLGİ
-    # ========================================================
-
-    if tahmin_yapilamayan > 0:
-
-        st.warning(
-            f"⚠️ {tahmin_yapilamayan} ürün için "
-            f"tahmin oluşturulamadı. "
-            f"Bu ürünlerin çap + mamul kalitesi + "
-            f"kütük kalitesi kombinasyonu "
-            f"Diler Proje Verileri eğitim verisinde "
-            f"bulunmamaktadır. "
-            f"Toplam süre yalnızca tahmin yapılabilen "
-            f"{tahmin_yapilabilen} ürün üzerinden hesaplanmıştır."
-        )
-
-    else:
-
-        st.success(
-            f"✅ {tahmin_yapilabilen} ürünün tamamı "
-            f"için tahmin oluşturuldu."
-        )
-
-
-    # ========================================================
-    # TOPLAM TAHMİNİ SÜRE KARTI
-    # ========================================================
-
-    with col2:
-
-        st.markdown(
-            f"""
-            <div class="card">
-
-                <div class="card-title">
-                    Toplam Tahmini Süre
-                </div>
-
-                <div class="card-value">
-                    {saat} sa {dakika} dk
-                </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    st.divider()
 
 
     # ========================================================
     # ÜRETİM BAŞLANGIÇ BİLGİLERİ
     # ========================================================
 
-    st.divider()
-
     st.subheader(
         "Üretim Başlangıç Bilgileri"
     )
 
 
-    col_tarih, col_saat = st.columns(2)
+    tarih_col, saat_col = st.columns(2)
 
 
-    with col_tarih:
+    with tarih_col:
 
         baslangic_tarihi = st.date_input(
             "Başlangıç Tarihi",
@@ -677,7 +636,7 @@ if dosya is not None:
         )
 
 
-    with col_saat:
+    with saat_col:
 
         baslangic_saati = st.time_input(
             "Başlangıç Saati",
@@ -686,7 +645,7 @@ if dosya is not None:
 
 
     # ========================================================
-    # BİTİŞ ZAMANI
+    # TAHMİNİ BİTİŞ ZAMANI
     # ========================================================
 
     baslangic_zamani = datetime.combine(
@@ -703,25 +662,11 @@ if dosya is not None:
     )
 
 
-    # ========================================================
-    # BİTİŞ ZAMANI GÖSTER
-    # ========================================================
-
-    st.markdown(
-        f"""
-        <div class="total-box">
-
-            <div class="total-title">
-                TAHMİNİ ÜRETİM BİTİŞ ZAMANI
-            </div>
-
-            <div class="total-value">
-                {bitis_zamani.strftime("%d.%m.%Y %H:%M")}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.success(
+        "🏭 Tahmini üretim bitiş zamanı: "
+        + bitis_zamani.strftime(
+            "%d.%m.%Y %H:%M"
+        )
     )
 
 
@@ -734,45 +679,26 @@ if dosya is not None:
     )
 
 
-    # Teknik kontrol sütunlarını kullanıcıdan gizle
-    sonuc_gosterim = yeni.drop(
-        columns=[
-            "TAHMIN_YAPILABILIR"
-        ]
-    )
+    # Kullanıcıya gösterilecek tablo
+    gosterilecek_sutunlar = [
+        "Filmasin Cap mm -FILMASIN",
+        "Mamul Kalitesi -FILMASIN",
+        "Uretilecek Paket Sayisi -FILMASIN",
+        "Kutuk Kalitesi -KUTUK",
+        "TAHMINI_1_KUTUK_SURESI",
+        "TAHMINI_TOPLAM_SURE"
+    ]
 
 
     st.dataframe(
-        sonuc_gosterim,
+        yeni[gosterilecek_sutunlar],
         use_container_width=True,
         hide_index=True
     )
 
 
     # ========================================================
-    # TOPLAM SÜRE
-    # ========================================================
-
-    st.markdown(
-        f"""
-        <div class="total-box">
-
-            <div class="total-title">
-                TOPLAM TAHMİNİ ÜRETİM SÜRESİ
-            </div>
-
-            <div class="total-value">
-                {saat} saat {dakika} dakika {saniye} saniye
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
-    # ========================================================
-    # EXCEL OLUŞTUR
+    # EXCEL DOSYASI
     # ========================================================
 
     sonuc_excel = BytesIO()
@@ -783,7 +709,7 @@ if dosya is not None:
         engine="openpyxl"
     ) as writer:
 
-        sonuc_gosterim.to_excel(
+        yeni[gosterilecek_sutunlar].to_excel(
             writer,
             index=False,
             sheet_name="Tahmin Sonuclari"
@@ -799,11 +725,8 @@ if dosya is not None:
 
     st.download_button(
         label="Tahmin Sonuçlarını Excel Olarak İndir",
-
         data=sonuc_excel.getvalue(),
-
         file_name="Diler_Tahmin_Sonuclari.xlsx",
-
         mime=(
             "application/vnd.openxmlformats-officedocument."
             "spreadsheetml.sheet"
@@ -818,9 +741,7 @@ if dosya is not None:
     # E-POSTA GÖNDER
     # ========================================================
 
-    if st.button(
-        "📧 E-posta ile Gönder"
-    ):
+    if st.button("📧 E-posta ile Gönder"):
 
         try:
 
@@ -844,6 +765,7 @@ if dosya is not None:
                 "Diler Üretim Süresi Tahmin Sonuçları"
             )
 
+
             mesaj["From"] = email_address
 
             mesaj["To"] = to_email
@@ -853,17 +775,17 @@ if dosya is not None:
                 f"""
 Merhaba,
 
-Diler Üretim Süresi Tahmin Sistemi tarafından oluşturulan
-tahmin sonuçları ekte paylaşılmıştır.
-
-Toplam tahmini üretim süresi:
-{saat} saat {dakika} dakika {saniye} saniye
+Diler Üretim Süresi Tahmin Sistemi tarafından
+oluşturulan tahmin sonuçları ekte paylaşılmıştır.
 
 Tahmin yapılabilen ürün sayısı:
 {tahmin_yapilabilen}
 
 Tahmin yapılamayan ürün sayısı:
 {tahmin_yapilamayan}
+
+Toplam tahmini üretim süresi:
+{saat} saat {dakika} dakika {saniye} saniye
 
 Tahmini üretim bitiş zamanı:
 {bitis_zamani.strftime("%d.%m.%Y %H:%M")}
@@ -875,17 +797,12 @@ Tahmini üretim bitiş zamanı:
 
             mesaj.add_attachment(
                 sonuc_excel.getvalue(),
-
                 maintype="application",
-
                 subtype=(
                     "vnd.openxmlformats-officedocument."
                     "spreadsheetml.sheet"
                 ),
-
-                filename=(
-                    "Diler_Tahmin_Sonuclari.xlsx"
-                )
+                filename="Diler_Tahmin_Sonuclari.xlsx"
             )
 
 
