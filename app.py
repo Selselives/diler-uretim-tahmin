@@ -349,40 +349,52 @@ if dosya is not None:
     yeni["TAHMINI_TOPLAM_SURE"] = 0.0
 
 
-    # ------------------------------------------------
-    # SADECE GEÇERLİ KOMBİNASYONLARI TAHMİN ET
-    # ------------------------------------------------
+# ------------------------------------------------
+# SADECE GEÇERLİ KOMBİNASYONLARI TAHMİN ET
+# ------------------------------------------------
 
-    gecerli_index = yeni.index[
-        yeni["TAHMIN_YAPILABILIR"]
+gecerli_index = yeni.index[
+    yeni["TAHMIN_YAPILABILIR"]
+]
+
+
+if len(gecerli_index) > 0:
+
+    model_tahmin_data = model_data.loc[
+        gecerli_index
     ]
 
+    tahmin = model.predict(
+        model_tahmin_data
+    )
 
-    if len(gecerli_index) > 0:
+    # Tahmin sonucunu tek boyutlu hale getir
+    tahmin = tahmin.flatten()
 
-        model_tahmin_data = model_data.loc[
-            gecerli_index
-        ]
+    # Tahminleri güvenli şekilde yerleştir
+    for i, index in enumerate(gecerli_index):
 
-        tahmin = model.predict(
-            model_tahmin_data
+        yeni.at[
+            index,
+            "TAHMINI_1_KUTUK_SURESI"
+        ] = round(
+            float(tahmin[i]),
+            2
         )
 
-        yeni.loc[
-            gecerli_index,
-            "TAHMINI_1_KUTUK_SURESI"
-        ] = tahmin.round(2)
-
-        yeni.loc[
-            gecerli_index,
+        yeni.at[
+            index,
             "TAHMINI_TOPLAM_SURE"
-        ] = (
-            tahmin
-            * yeni.loc[
-                gecerli_index,
-                "Uretilecek Paket Sayisi -FILMASIN"
-            ]
-        ).round(2)
+        ] = round(
+            float(tahmin[i])
+            * float(
+                yeni.at[
+                    index,
+                    "Uretilecek Paket Sayisi -FILMASIN"
+                ]
+            ),
+            2
+        )
 
 
     # ------------------------------------------------
